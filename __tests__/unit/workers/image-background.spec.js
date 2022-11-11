@@ -3,8 +3,6 @@ import { ImageBackgroundWorker } from '../../../src/workers/image-background.wor
 import { parentPortMock } from './mocks/parent-port-mock.js'
 
 describe('#imageBackground - WORKER', () => {
-    
-  
     let imageBackgroundWorker = new ImageBackgroundWorker({ parentPort: parentPortMock })
 
     beforeEach(() => {
