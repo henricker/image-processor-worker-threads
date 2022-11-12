@@ -18,16 +18,16 @@ describe('#imageBackground - WORKER', () => {
         expect(parentPortMock.on).toHaveBeenCalledWith('message', expect.any(Function))
     })
     it('Should send business error message if data is invalid', async () => {
-        const message = {
+      	const message = {
             imageUrl: 'invalid-url',
             backgroundUrl: 'invalid-url'
         }
 
-       await imageBackgroundWorker.handleMessage(message)
-     
-			expect(parentPortMock.emit).toHaveBeenCalledWith('messageerror', 'imageUrl must be a valid URL, backgroundUrl must be a valid URL')
-			expect(parentPortMock.removeAllListeners).toBeCalled()
-			expect(parentPortMock.unref).toBeCalled()
+        await imageBackgroundWorker.handleMessage(message)
+    
+        expect(parentPortMock.emit).toHaveBeenCalledWith('messageerror', 'imageUrl must be a valid URL, backgroundUrl must be a valid URL')
+        expect(parentPortMock.removeAllListeners).toBeCalled()
+        expect(parentPortMock.unref).toBeCalled()
     
     })
     it('Should send internal server error message if error is not a business error', async () => {
@@ -36,13 +36,13 @@ describe('#imageBackground - WORKER', () => {
             backgroundUrl: 'https://google.com'
         }
 
-				jest.spyOn(axios, 'get').mockRejectedValueOnce(new Error('any_error'))
+		jest.spyOn(axios, 'get').mockRejectedValueOnce(new Error('any_error'))
   
         await imageBackgroundWorker.handleMessage(message)
 
-				expect(parentPortMock.emit).toHaveBeenCalledWith('messageerror', 'Internal server error')
+		expect(parentPortMock.emit).toHaveBeenCalledWith('messageerror', 'Internal server error')
        	expect(parentPortMock.removeAllListeners).toBeCalled()
-				expect(parentPortMock.unref).toBeCalled()
+		expect(parentPortMock.unref).toBeCalled()
     })
     it.todo('Should return a base64 image')
 })
