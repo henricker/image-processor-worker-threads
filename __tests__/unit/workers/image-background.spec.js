@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, jest, beforeAll } from '@jest/globals'
 import { parentPortMock } from './mocks/parent-port-mock.js'
-import axios from 'axios'
-
 import { ImageBackgroundWorker } from '../../../src/workers/image-background.worker.js'
+import { mockAxios } from './mocks/axios-mock.js'
+import { mockSharp } from './mocks/sharp-mock.js'
 
 describe('#imageBackground - WORKER', () => {
-    let imageBackgroundWorker = new ImageBackgroundWorker({ parentPort: parentPortMock })
+    let imageBackgroundWorker = new ImageBackgroundWorker({ parentPort: parentPortMock, axios: mockAxios, sharp: mockSharp })
 
     beforeEach(async () => {
-        imageBackgroundWorker = new ImageBackgroundWorker({ parentPort: parentPortMock })
+        imageBackgroundWorker = new ImageBackgroundWorker({ parentPort: parentPortMock, axios: mockAxios, sharp: mockSharp })
     })
     afterEach(() => {
         jest.restoreAllMocks();
@@ -36,7 +36,7 @@ describe('#imageBackground - WORKER', () => {
             backgroundUrl: 'https://google.com'
         }
 
-		jest.spyOn(axios, 'get').mockRejectedValueOnce(new Error('any_error'))
+		jest.spyOn(mockAxios, 'get').mockRejectedValueOnce(new Error('any_error'))
   
         await imageBackgroundWorker.handleMessage(message)
 
@@ -44,5 +44,23 @@ describe('#imageBackground - WORKER', () => {
        	expect(parentPortMock.removeAllListeners).toBeCalled()
 		expect(parentPortMock.unref).toBeCalled()
     })
-    it.todo('Should return a base64 image')
+    it('Should send message to parent process with base 64 image', async () => {
+        const message = {
+            imageUrl: 'https://google.com',
+            backgroundUrl: 'https://google.com'
+        }
+
+        const imageBuffer = Buffer.from('any_image_buffer')
+        const backgroundBuffer = Buffer.from('any_background_buffer')
+
+        jest.spyOn(mockAxios, 'get').mockResolvedValueOnce({
+            data: imageBuffer
+        }).mockResolvedValueOnce({
+            data: backgroundBuffer
+        })
+
+        await imageBackgroundWorker.handleMessage(message)
+
+        expect(parentPortMock.postMessage).toBeCalledWith(Buffer.from('any_composite_image', 'base64'))
+    })
 })
