@@ -1,15 +1,20 @@
 import { parentPort as parentThreadPort } from 'worker_threads'
 import { BusinessError } from '../error/business-error.js'
 import * as yup from 'yup';
-import sharp from 'sharp';
 import axios from 'axios'
+import sharp from 'sharp'
 
 const kparentPort = Symbol('parentPort')
 export class ImageBackgroundWorker {
     
-    constructor({ parentPort }) {
+    #sharp = null;
+    #axios = null;
+    constructor({ parentPort, axios, sharp }) {
         this[kparentPort] = parentPort
         this.#listenEvents()
+
+        this.#sharp = sharp
+        this.#axios = axios
     }
 
     #listenEvents() {
@@ -36,7 +41,7 @@ export class ImageBackgroundWorker {
     }
 
     async #downloadImage(url) {
-        const response = await axios.get(url, {
+        const response = await this.#axios.get(url, {
             responseType: 'arraybuffer'
         })
 
@@ -49,15 +54,15 @@ export class ImageBackgroundWorker {
             if(!isValid.valid) {
                 throw new BusinessError(isValid.errors)
             }
+
             const imageBuffer = await this.#downloadImage(imageUrl)
             const backgroundBuffer = await this.#downloadImage(backgroundUrl)
 
-            const compositeImage = await sharp(backgroundBuffer).composite([
-                { input: imageBuffer, gravity: sharp.gravity.south }
+            const compositeImage = await this.#sharp(backgroundBuffer).composite([
+                { input: imageBuffer, gravity: this.#sharp.gravity.south }
             ]).toBuffer()
 
             const compositeBase64 = compositeImage.toString('base64')
-
 
             this[kparentPort].postMessage(compositeBase64)
         } catch(err) {
@@ -70,6 +75,6 @@ export class ImageBackgroundWorker {
 }
 
 if(process.env.NODE_ENV !== 'test') {
-    new ImageBackgroundWorker({ parentPort: parentThreadPort })
+    new ImageBackgroundWorker({ parentPort: parentThreadPort, axios, sharp })
 }
 
