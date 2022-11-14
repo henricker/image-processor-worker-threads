@@ -1,8 +1,12 @@
 import { parentPort as parentThreadPort } from 'worker_threads'
-import { BusinessError } from '../error/business-error.js'
-import * as yup from 'yup';
 import axios from 'axios'
 import sharp from 'sharp'
+import errors from '../error/index.js'
+import * as yup from 'yup';
+const { 
+    BusinessError,
+    InternalServerError,
+} = errors
 
 const kparentPort = Symbol('parentPort')
 export class ImageBackgroundWorker {
@@ -11,14 +15,8 @@ export class ImageBackgroundWorker {
     #axios = null;
     constructor({ parentPort, axios, sharp }) {
         this[kparentPort] = parentPort
-        this.#listenEvents()
-
         this.#sharp = sharp
         this.#axios = axios
-    }
-
-    #listenEvents() {
-        this[kparentPort].on('message', this.handleMessage.bind(this))
     }
 
     async #validateData(data) {
@@ -48,7 +46,7 @@ export class ImageBackgroundWorker {
         return response.data;
     }
 
-    async handleMessage({ imageUrl, backgroundUrl }) {
+    async processThread({ imageUrl, backgroundUrl }) {
         try {
             const isValid = await this.#validateData({ imageUrl, backgroundUrl })
             if(!isValid.valid) {
@@ -62,19 +60,26 @@ export class ImageBackgroundWorker {
                 { input: imageBuffer, gravity: this.#sharp.gravity.south }
             ]).toBuffer()
 
-            const compositeBase64 = compositeImage.toString('base64')
-
-            this[kparentPort].postMessage(compositeBase64)
+            return compositeImage.toString('base64')
         } catch(err) {
-            const message = err instanceof BusinessError ? err.message : 'Internal server error' 
-            this[kparentPort].emit('messageerror', message.trim())
-            this[kparentPort].removeAllListeners()
-            this[kparentPort].unref()
+            const message = err instanceof InternalServerError ? 'Internal server error' : err.message 
+
+            if(message === 'Internal server error') {
+                const internalError = new InternalServerError(message)
+                internalError.stack = err.stack
+                throw internalError
+            }
+        
+            throw err
         }
     }
 }
 
-if(process.env.NODE_ENV !== 'test') {
-    new ImageBackgroundWorker({ parentPort: parentThreadPort, axios, sharp })
+export default (data) => {
+    if(process.env.NODE_ENV !== 'test') {
+        return new ImageBackgroundWorker({ parentPort: parentThreadPort, axios, sharp }).processThread(data)
+    }
 }
+
+
 
