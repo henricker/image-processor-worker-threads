@@ -16,6 +16,10 @@ describe('#imageBackground - WORKER', () => {
         jest.clearAllMocks();
     })
 
+    it('Should listen message event', () => {
+        expect(parentPortMock.on).toHaveBeenCalledWith('message', expect.any(Function))
+    })
+
     it('Should send business error message if data is invalid', async () => {
       	const message = {
             imageUrl: 'invalid-url',
@@ -58,8 +62,7 @@ describe('#imageBackground - WORKER', () => {
             data: backgroundBuffer
         })
 
-        const imageCompositeBase64 = await imageBackgroundWorker.processThread(message)
-
-        expect(imageCompositeBase64).toEqual(Buffer.from('any_composite_image', 'base64'))
+        await imageBackgroundWorker.processThread(message)
+        expect(parentPortMock.postMessage).toBeCalledWith(Buffer.from('any_composite_image', 'base64'))
     })
 })

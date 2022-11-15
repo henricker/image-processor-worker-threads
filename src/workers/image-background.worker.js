@@ -9,14 +9,19 @@ const {
 } = errors
 
 const kparentPort = Symbol('parentPort')
+const kaxios = Symbol('axios')
+const ksharp = Symbol('sharp')
 export class ImageBackgroundWorker {
-    
-    #sharp = null;
-    #axios = null;
     constructor({ parentPort, axios, sharp }) {
         this[kparentPort] = parentPort
-        this.#sharp = sharp
-        this.#axios = axios
+        this[kaxios] = axios
+        this[ksharp] = sharp
+
+        this.#listenEvents()
+    }
+
+    #listenEvents() {
+        this[kparentPort].on('message', this.processThread.bind(this))
     }
 
     async #validateData(data) {
@@ -39,7 +44,7 @@ export class ImageBackgroundWorker {
     }
 
     async #downloadImage(url) {
-        const response = await this.#axios.get(url, {
+        const response = await this[kaxios].get(url, {
             responseType: 'arraybuffer'
         })
 
@@ -56,13 +61,13 @@ export class ImageBackgroundWorker {
             const imageBuffer = await this.#downloadImage(imageUrl)
             const backgroundBuffer = await this.#downloadImage(backgroundUrl)
 
-            const compositeImage = await this.#sharp(backgroundBuffer).composite([
-                { input: imageBuffer, gravity: this.#sharp.gravity.south }
+            const compositeImage = await this[ksharp](backgroundBuffer).composite([
+                { input: imageBuffer, gravity: this[ksharp].gravity.south }
             ]).toBuffer()
 
-            return compositeImage.toString('base64')
+            this[kparentPort].postMessage(compositeImage.toString('base64'))
         } catch(err) {
-            const message = err instanceof InternalServerError ? 'Internal server error' : err.message 
+            const message = err instanceof BusinessError ? err.message : 'Internal server error'
 
             if(message === 'Internal server error') {
                 const internalError = new InternalServerError(message)
@@ -75,11 +80,16 @@ export class ImageBackgroundWorker {
     }
 }
 
-export default (data) => {
-    if(process.env.NODE_ENV !== 'test') {
-        return new ImageBackgroundWorker({ parentPort: parentThreadPort, axios, sharp }).processThread(data)
-    }
+
+if(process.env.NODE_ENV !== 'test') {
+    new ImageBackgroundWorker({
+        parentPort: parentThreadPort,
+        axios,
+        sharp
+    })
 }
+
+
 
 
 
